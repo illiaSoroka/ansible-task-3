@@ -1,0 +1,53 @@
+- name: Create 5 X CentOS 7 VMs
+  hosts: all
+  vars:
+    nameservers:
+    - '8.8.8.8'
+    - '8.8.4.4'
+    ntp_server:
+    - 'time2.google.com'
+    - 'time1.google.com'
+
+  tasks:
+
+  ####### Clean up section ########
+  - name: Clean up /etc/chrony.conf
+    lineinfile:
+      path: /etc/chrony.conf
+      state: absent
+      regexp: '^server .*$'
+  
+  - name: Clean up /etc/resolv.conf
+    lineinfile:
+      path: /etc/resolv.conf
+      state: absent
+      regexp: '^nameserver .*$'
+  ##################################
+
+  ########## Update hosts ##########
+  - name: Update hosts file in each VM
+    lineinfile:
+      path: /etc/hosts
+      line: "{{ ansible_host }} {{ inventory_hostname }}"
+      create: yes
+  
+  ###### Update google server ######
+  - name: Update google server
+    lineinfile:
+      path: /etc/resolv.conf
+      line: "nameserver {{ item }}"
+    with_items: "{{ nameservers }}"
+  
+  ######## Update NTP server #######   
+  - name: Update NTP servers
+    lineinfile:
+      path: /etc/chrony.conf
+      line: "server {{ item }} iburst"
+      insertafter: '^# Please '
+    with_items: "{{ ntp_server }}"
+      
+  ######## Restart chronyd #######  
+  - name: Restart chronyd
+    systemd:
+      name: chronyd
+      state: restarted
